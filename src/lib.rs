@@ -49,7 +49,7 @@ impl<N: Num> Add<N> for Buffer<N> {
 }
 
 impl<N: Num> Buffer<N> {
-    /// Adds the values of matching-length Buffer into this Buffer.
+    /// Adds the values of matching-length Buffer into this `Buffer`.
     pub fn add_mut(&mut self, other: &Buffer<N>) {
         self.buffer
             .iter_mut()
@@ -57,12 +57,12 @@ impl<N: Num> Buffer<N> {
             .for_each(|(a, b)| *a = *a + *b);
     }
 
-    /// Adds value of type `N` to each value in this Buffer.
+    /// Adds value of type `N` to each value in this `Buffer`.
     pub fn add_into_mut(&mut self, value: N) {
         self.buffer.iter_mut().for_each(|a| *a = *a + value);
     }
 
-    /// Adds the value of type `N` to each value of a copy of this Buffer.
+    /// Adds the value of type `N` to each value of a copy of this `Buffer`.
     pub fn add_into(&self, value: N) -> Self {
         Buffer {
             buffer: self.buffer.iter().map(|a| *a + value).collect(),
@@ -105,6 +105,7 @@ impl<N: Num> Sub<N> for Buffer<N> {
 }
 
 impl<N: Num> Buffer<N> {
+    /// Subtracts the values of matching-length Buffer into this `Buffer`.
     pub fn subtract_mut(&mut self, other: &Buffer<N>) {
         self.buffer
             .iter_mut()
@@ -112,10 +113,12 @@ impl<N: Num> Buffer<N> {
             .for_each(|(a, b)| *a = *a - *b);
     }
 
+    /// Subtracts value of type `N` from each value in this `Buffer`.
     pub fn subtract_into_mut(&mut self, value: N) {
         self.buffer.iter_mut().for_each(|a| *a = *a - value);
     }
 
+    /// Subtracts the value of type `N` from each value of a copy of this `Buffer`.
     pub fn subtract_into(&self, value: N) -> Self {
         Buffer {
             buffer: self.buffer.iter().map(|a| *a - value).collect(),
@@ -158,6 +161,7 @@ impl<N: Num> Mul<N> for Buffer<N> {
 }
 
 impl<N: Num> Buffer<N> {
+    /// Multiplies the values of matching-length Buffer into this `Buffer`.
     pub fn multiply_mut(&mut self, other: &Buffer<N>) {
         self.buffer
             .iter_mut()
@@ -165,10 +169,12 @@ impl<N: Num> Buffer<N> {
             .for_each(|(a, b)| *a = *a * *b);
     }
 
+    /// Multiplies value of type `N` with each value in this `Buffer`.
     pub fn multiply_into_mut(&mut self, scalar: N) {
         self.buffer.iter_mut().for_each(|a| *a = *a * scalar);
     }
 
+    /// Multiplies the value of type `N` with each value of a copy of this `Buffer`.
     pub fn multiply_into(&self, scalar: N) -> Self {
         Buffer {
             buffer: self.buffer.iter().map(|a| *a * scalar).collect(),
@@ -211,6 +217,7 @@ impl<N: Num> Div<N> for Buffer<N> {
 }
 
 impl<N: Num> Buffer<N> {
+    /// Divides the values of matching-length Buffer into this `Buffer`.
     pub fn divide_mut(&mut self, other: &Buffer<N>) {
         self.buffer
             .iter_mut()
@@ -218,10 +225,12 @@ impl<N: Num> Buffer<N> {
             .for_each(|(a, b)| *a = *a / *b);
     }
 
+    /// Divides value of type `N` from each value in this `Buffer`.
     pub fn divide_into_mut(&mut self, divisor: N) {
         self.buffer.iter_mut().for_each(|a| *a = *a / divisor);
     }
 
+    /// Divides the value of type `N` from each value of a copy of this `Buffer`.
     pub fn divide_into(&self, divisor: N) -> Self {
         Buffer {
             buffer: self.buffer.iter().map(|a| *a / divisor).collect(),
@@ -235,12 +244,19 @@ impl<N: Num> Buffer<N> {
 
 impl<N: Num> Index<usize> for Buffer<N> {
     type Output = N;
+
+    /// Performs the indexing (`container[index]`) operation.
+    ///
+    /// **Panics** If the index is out of bounds.
     fn index<'a>(&'_ self, i: usize) -> &'_ N {
         &self.buffer[i]
     }
 }
 
 impl<N: Num> IndexMut<usize> for Buffer<N> {
+    /// Performs the mutable indexing (`container[index]`) operation.
+    ///
+    /// **Panics** If the index is out of bounds.
     fn index_mut<'a>(&'_ mut self, i: usize) -> &'_ mut N {
         &mut self.buffer[i]
     }
@@ -250,6 +266,7 @@ impl<N: Num> IndexMut<usize> for Buffer<N> {
 // Buffer Iterator
 ///////////////////////
 
+/// Represents an iterator across values contained in an instance of `Buffer<N>`.
 pub struct BufferIter<'a, N: Num> {
     vec: &'a Buffer<N>,
     curr: usize,
@@ -595,6 +612,7 @@ struct ImageBuffer<N: Num> {
 impl<N: Num> Add for ImageBuffer<N> {
     type Output = Self;
 
+    /// Performs the + operation for `ImageBuffer<N>`.
     fn add(self, other: Self) -> Self {
         if !self.dims_match(&other) {
             panic!("Image buffer dimensions do not match!");
@@ -610,6 +628,7 @@ impl<N: Num> Add for ImageBuffer<N> {
 impl<N: Num> Add<N> for ImageBuffer<N> {
     type Output = Self;
 
+    /// Performs the + operation for `ImageBuffer<N>` and a single value of type `N`.
     fn add(self, other: N) -> Self {
         ImageBuffer {
             buffer: self.buffer + other,
@@ -620,10 +639,12 @@ impl<N: Num> Add<N> for ImageBuffer<N> {
 }
 
 impl<N: Num> ImageBuffer<N> {
+    /// Adds the values of matching-length `ImageBuffer` into this `ImageBuffer`.
     pub fn add_mut(&mut self, other: &ImageBuffer<N>) {
         self.buffer.add_mut(&other.buffer);
     }
 
+    /// Adds value of type `N` to each value in this `ImageBuffer`.
     pub fn add_into(&self, other: N) -> Self {
         ImageBuffer {
             width: self.width,
@@ -632,6 +653,7 @@ impl<N: Num> ImageBuffer<N> {
         }
     }
 
+    /// Adds the value of type `N` to each value of a copy of this `ImageBuffer`.
     pub fn add_into_mut(&mut self, other: N) {
         self.buffer.add_into(other);
     }
@@ -644,6 +666,7 @@ impl<N: Num> ImageBuffer<N> {
 impl<N: Num> Sub for ImageBuffer<N> {
     type Output = Self;
 
+    /// Performs the - operation for `ImageBuffer<N>`.
     fn sub(self, other: Self) -> Self {
         if !self.dims_match(&other) {
             panic!("Image buffer dimensions do not match!");
@@ -659,6 +682,7 @@ impl<N: Num> Sub for ImageBuffer<N> {
 impl<N: Num> Sub<N> for ImageBuffer<N> {
     type Output = Self;
 
+    /// Performs the - operation for `ImageBuffer<N>` and a single value of type `N`.
     fn sub(self, other: N) -> Self {
         ImageBuffer {
             buffer: self.buffer - other,
@@ -669,10 +693,12 @@ impl<N: Num> Sub<N> for ImageBuffer<N> {
 }
 
 impl<N: Num> ImageBuffer<N> {
+    /// Subtracts the values of matching-length `ImageBuffer` into this `ImageBuffer`.
     pub fn subtract_mut(&mut self, other: &ImageBuffer<N>) {
         self.buffer.subtract_mut(&other.buffer);
     }
 
+    /// Subtracts value of type `N` from each value in this `ImageBuffer`.
     pub fn subtract_into(&self, other: N) -> Self {
         ImageBuffer {
             width: self.width,
@@ -681,6 +707,7 @@ impl<N: Num> ImageBuffer<N> {
         }
     }
 
+    /// Subtracts the value of type `N` from each value of a copy of this `ImageBuffer`.
     pub fn subtract_into_mut(&mut self, other: N) {
         self.buffer.subtract_into(other);
     }
@@ -693,6 +720,7 @@ impl<N: Num> ImageBuffer<N> {
 impl<N: Num> Mul for ImageBuffer<N> {
     type Output = Self;
 
+    /// Performs the * operation for `ImageBuffer<N>`.
     fn mul(self, other: Self) -> Self {
         if !self.dims_match(&other) {
             panic!("Image buffer dimensions do not match!");
@@ -708,6 +736,7 @@ impl<N: Num> Mul for ImageBuffer<N> {
 impl<N: Num> Mul<N> for ImageBuffer<N> {
     type Output = Self;
 
+    /// Performs the * operation for `ImageBuffer<N>` and a single value of type `N`.
     fn mul(self, other: N) -> Self {
         ImageBuffer {
             buffer: self.buffer * other,
@@ -718,10 +747,12 @@ impl<N: Num> Mul<N> for ImageBuffer<N> {
 }
 
 impl<N: Num> ImageBuffer<N> {
+    /// Multiplies the values of matching-length Buffer into this `ImageBuffer`.
     pub fn multiply_mut(&mut self, other: &ImageBuffer<N>) {
         self.buffer.multiply_mut(&other.buffer);
     }
 
+    /// Multiplies value of type `N` with each value in this `ImageBuffer`.
     pub fn multiply_into(&self, other: N) -> Self {
         ImageBuffer {
             width: self.width,
@@ -730,6 +761,7 @@ impl<N: Num> ImageBuffer<N> {
         }
     }
 
+    /// Multiplies the value of type `N` with each value of a copy of this `ImageBuffer`.
     pub fn multiply_into_mut(&mut self, other: N) {
         self.buffer.multiply_into(other);
     }
@@ -742,6 +774,7 @@ impl<N: Num> ImageBuffer<N> {
 impl<N: Num> Div for ImageBuffer<N> {
     type Output = Self;
 
+    /// Performs the / operation for `ImageBuffer<N>`.
     fn div(self, other: Self) -> Self {
         if !self.dims_match(&other) {
             panic!("Image buffer dimensions do not match!");
@@ -757,6 +790,7 @@ impl<N: Num> Div for ImageBuffer<N> {
 impl<N: Num> Div<N> for ImageBuffer<N> {
     type Output = Self;
 
+    /// Performs the / operation for `Buffer<N>` and a single value of type `N`.
     fn div(self, other: N) -> Self {
         ImageBuffer {
             buffer: self.buffer / other,
@@ -767,10 +801,12 @@ impl<N: Num> Div<N> for ImageBuffer<N> {
 }
 
 impl<N: Num> ImageBuffer<N> {
+    /// Divides the values of matching-length Buffer into this `ImageBuffer`.
     pub fn divide_mut(&mut self, other: &ImageBuffer<N>) {
         self.buffer.divide_mut(&other.buffer);
     }
 
+    /// Divides value of type `N` from each value in this `ImageBuffer`.
     pub fn divide_into(&self, other: N) -> Self {
         ImageBuffer {
             width: self.width,
@@ -779,6 +815,7 @@ impl<N: Num> ImageBuffer<N> {
         }
     }
 
+    /// Divides the value of type `N` from each value of a copy of this `ImageBuffer`.
     pub fn divide_into_mut(&mut self, other: N) {
         self.buffer.divide_into(other);
     }
