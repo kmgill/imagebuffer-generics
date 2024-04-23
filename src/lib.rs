@@ -1,5 +1,9 @@
+use std::ffi::OsStr;
 use std::ops::{Add, Div, Index, IndexMut, Mul, Sub};
+use std::path::Path;
 
+use anyhow::{Error, Result};
+use image::{DynamicImage, Luma};
 use itertools::iproduct;
 
 /// Represents a valid number to be used as a generic constraint in `Buffer` and `ImageBuffer`.
@@ -332,6 +336,36 @@ impl<N: Num> Buffer<N> {
         self.buffer.len()
     }
 
+    /// Returns true is the buffer is zero-length
+    pub fn is_empty(&self) -> bool {
+        self.buffer.is_empty()
+    }
+
+    /// Creates a new `Buffer` from an array of values of type `N`.
+    pub fn from_vector(values: &[N]) -> Self {
+        Buffer {
+            buffer: values.to_vec(),
+        }
+    }
+
+    /// Creates a new `Buffer` from an array of values of type `u8`.
+    ///
+    /// **panics** If `u8` is incompatible with type `N`.
+    pub fn from_vector_u8(values: &[u8]) -> Self {
+        Buffer {
+            buffer: values.iter().map(|v| N::from_u8(*v).unwrap()).collect(),
+        }
+    }
+
+    /// Creates a new `Buffer` from an array of values of type `u16`.
+    ///
+    /// **panics** If `u16` is incompatible with type `N`.
+    pub fn from_vector_u16(values: &[u16]) -> Self {
+        Buffer {
+            buffer: values.iter().map(|v| N::from_u16(*v).unwrap()).collect(),
+        }
+    }
+
     /// Creates a `Vec<u8>` with the content of this buffer. Each value is casted to `u8`.
     ///
     /// Values are not pre-normalized into a valid `u8` (0-255) range.
@@ -525,7 +559,7 @@ impl<N: Num> Buffer<N> {
     /// respective bound value.
     ///
     /// **panics** If any value is incompatible with type `f64`.
-    fn clip(&self, clip_min: N, clip_max: N) -> Self {
+    pub fn clip(&self, clip_min: N, clip_max: N) -> Self {
         let mut b = self.clone();
         b.clip_mut(clip_min, clip_max);
         b
@@ -536,7 +570,7 @@ impl<N: Num> Buffer<N> {
     /// respective bound value.
     ///
     /// **panics** If any value is incompatible with type `f64`.
-    fn clip_mut(&mut self, clip_min: N, clip_max: N) {
+    pub fn clip_mut(&mut self, clip_min: N, clip_max: N) {
         let mn: f64 = clip_min.to_f64().unwrap();
         let mx: f64 = clip_max.to_f64().unwrap();
         (0..self.len()).for_each(|i| {
@@ -599,7 +633,7 @@ pub struct Range<N: Num> {
 
 /// Represents a two-dimensional single-channel image buffer.
 #[derive(Clone)]
-struct ImageBuffer<N: Num> {
+pub struct ImageBuffer<N: Num> {
     buffer: Buffer<N>,
     width: usize,
     height: usize,
@@ -859,6 +893,20 @@ impl<N: Num> ImageBuffer<N> {
         self.buffer.buffer[self.xy_to_idx(x, y)].to_f64().unwrap()
     }
 
+    /// Retrieves the value at coordinate x/y, returning it as type `u8`.
+    ///
+    /// **panics** If the value is incompatible with type `u8`.
+    pub fn get_u8(&self, x: usize, y: usize) -> u8 {
+        self.buffer.buffer[self.xy_to_idx(x, y)].to_u8().unwrap()
+    }
+
+    /// Retrieves the value at coordinate x/y, returning it as type `u16`.
+    ///
+    /// **panics** If the value is incompatible with type `u16`.
+    pub fn get_u16(&self, x: usize, y: usize) -> u16 {
+        self.buffer.buffer[self.xy_to_idx(x, y)].to_u16().unwrap()
+    }
+
     /// Retrieves a value that is interpolated based on the fractional distance between
     /// floor(x) and floor(y) and ceil(x) and ceil(y)
     ///
@@ -882,9 +930,7 @@ impl<N: Num> ImageBuffer<N> {
 
             let v0 = v10 * yd + v00 * (1.0 - yd);
             let v1 = v11 * yd + v01 * (1.0 - yd);
-            let v = v1 * xd + v0 * (1.0 - xd);
-
-            v
+            v1 * xd + v0 * (1.0 - xd)
         } else {
             panic!("Invalid pixel coordinates");
         }
@@ -1041,7 +1087,7 @@ impl<N: Num> ImageBuffer<N> {
     /// respective bound value.
     ///
     /// **panics** If any value is incompatible with type `f64`.
-    fn clip(&self, clip_min: N, clip_max: N) -> Self {
+    pub fn clip(&self, clip_min: N, clip_max: N) -> Self {
         ImageBuffer {
             width: self.width,
             height: self.height,
@@ -1054,7 +1100,7 @@ impl<N: Num> ImageBuffer<N> {
     /// respective bound value.
     ///
     /// **panics** If any value is incompatible with type `f64`.
-    fn clip_mut(&mut self, clip_min: N, clip_max: N) {
+    pub fn clip_mut(&mut self, clip_min: N, clip_max: N) {
         self.buffer.clip(clip_min, clip_max);
     }
 
@@ -1078,6 +1124,112 @@ impl<N: Num> ImageBuffer<N> {
     pub fn range(&self) -> Range<N> {
         self.buffer.range()
     }
+
+    /// Saves the `ImageBuffer` to disk.
+    pub fn save_image_to(
+        &self,
+        output_file_name: &str,
+        format: OutputFormat,
+        mode: ImageMode,
+    ) -> Result<()> {
+        let corrected_file_name = format.replace_extension_for(output_file_name)?;
+        match mode {
+            ImageMode::U8BIT => self.save_image_to_8bpp(&corrected_file_name),
+            ImageMode::U16BIT => self.save_image_to_16bpp(&corrected_file_name),
+        }
+    }
+
+    /// Saves the `ImageBuffer` to disk as unsigned 16 bit.
+    fn save_image_to_16bpp(&self, output_file_name: &str) -> Result<()> {
+        let mut out_img =
+            DynamicImage::new_luma16(self.width as u32, self.height as u32).into_luma16();
+        iproduct!(0..self.height, 0..self.width).for_each(|(y, x)| {
+            out_img.put_pixel(x as u32, y as u32, Luma([self.get_u16(x, y)]));
+        });
+        if out_img.save(output_file_name).is_ok() {
+            Ok(())
+        } else {
+            Err(Error::msg("Failed to save image"))
+        }
+    }
+
+    /// Saves the `ImageBuffer` to disk as unsigned 8 bit.
+    fn save_image_to_8bpp(&self, output_file_name: &str) -> Result<()> {
+        let mut out_img =
+            DynamicImage::new_luma8(self.width as u32, self.height as u32).into_luma8();
+        iproduct!(0..self.height, 0..self.width).for_each(|(y, x)| {
+            out_img.put_pixel(x as u32, y as u32, Luma([self.get_u8(x, y)]));
+        });
+        if out_img.save(output_file_name).is_ok() {
+            Ok(())
+        } else {
+            Err(Error::msg("Failed to save image"))
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
+pub enum OutputFormat {
+    PNG,
+    JPEG,
+    #[default]
+    TIFF,
+    // DNG,
+}
+
+impl OutputFormat {
+    pub fn from_string(s: &str) -> Result<OutputFormat> {
+        match s.to_uppercase().as_str() {
+            "PNG" => Ok(OutputFormat::PNG),
+            "JPG" | "JPEG" => Ok(OutputFormat::JPEG),
+            "TIF" | "TIFF" => Ok(OutputFormat::TIFF),
+            // "DNG" => Ok(OutputFormat::DNG),
+            _ => Err(Error::msg(format!(
+                "Invalid output format specified: {}",
+                s
+            ))),
+        }
+    }
+
+    pub fn from_filename(s: &str) -> Result<OutputFormat> {
+        if let Some(extension) = Path::new(s).extension().and_then(OsStr::to_str) {
+            match extension.to_string().to_uppercase().as_str() {
+                // "DNG" => Ok(OutputFormat::DNG),
+                "PNG" => Ok(OutputFormat::PNG),
+                "TIF" | "TIFF" => Ok(OutputFormat::TIFF),
+                "JPG" | "JPEG" => Ok(OutputFormat::JPEG),
+                _ => Err(Error::msg(format!(
+                    "Unable to determine output format or is an unsupported format: {}",
+                    extension
+                ))),
+            }
+        } else {
+            Err(Error::msg("Unable to isolate filename extension"))
+        }
+    }
+
+    pub fn replace_extension_with(filename: &str, new_extension: &str) -> Result<String> {
+        if let Some(new_filename) = Path::new(filename).with_extension(new_extension).to_str() {
+            Ok(new_filename.to_string())
+        } else {
+            Err(Error::msg("Unable to replace filename"))
+        }
+    }
+
+    pub fn replace_extension_for(self, filename: &str) -> Result<String> {
+        match self {
+            // OutputFormat::DNG => replace_extension_with(filename, "dng"),
+            OutputFormat::PNG => OutputFormat::replace_extension_with(filename, "png"),
+            OutputFormat::TIFF => OutputFormat::replace_extension_with(filename, "tif"),
+            OutputFormat::JPEG => OutputFormat::replace_extension_with(filename, "jpg"),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum ImageMode {
+    U8BIT,
+    U16BIT,
 }
 
 impl Num for f32 {}
@@ -1145,5 +1297,88 @@ mod tests {
         let image0 = ImageBuffer4ByteFloat::new(1024, 1024, 0.0);
         let image1 = ImageBuffer4ByteFloat::new(2048, 2048, 0.0);
         _ = image0 + image1;
+    }
+
+    #[test]
+    fn test_save() -> Result<()> {
+        let image0 = ImageBuffer4ByteFloat::new(1024, 1024, 0.0);
+
+        // Test: Saves as an 8 bit PNG
+
+        image0.save_image_to(
+            "target/testsave_image0_8bit_png.png",
+            OutputFormat::PNG,
+            ImageMode::U8BIT,
+        )?;
+
+        assert!(Path::new("target/testsave_image0_8bit_png.png").exists());
+
+        // Test: Saves as an 8 bit TIF, replaces .png extension with .tif
+
+        image0.save_image_to(
+            "target/testsave_image0_8bit_png.png",
+            OutputFormat::TIFF,
+            ImageMode::U8BIT,
+        )?;
+
+        assert!(Path::new("target/testsave_image0_8bit_png.tif").exists());
+
+        // Test: Saves as a 16 bit png
+
+        image0.save_image_to(
+            "target/testsave_image0_16bit_png.png",
+            OutputFormat::PNG,
+            ImageMode::U16BIT,
+        )?;
+
+        assert!(Path::new("target/testsave_image0_16bit_png.png").exists());
+
+        // Test: Saves as a 16 bit tif, replaces .png extension with .tif
+        image0.save_image_to(
+            "target/testsave_image0_16bit_png.png",
+            OutputFormat::TIFF,
+            ImageMode::U16BIT,
+        )?;
+
+        assert!(Path::new("target/testsave_image0_16bit_png.tif").exists());
+
+        // Test: Saves as an 8 bit jpeg, appends .jpg to missing extension
+
+        image0.save_image_to(
+            "target/testsave_image0_8bit_png",
+            OutputFormat::JPEG,
+            ImageMode::U8BIT,
+        )?;
+
+        assert!(Path::new("target/testsave_image0_8bit_png.jpg").exists());
+
+        Ok(())
+    }
+
+    #[test]
+    fn create_gray_with_math() {
+        // Create a 1024x1024 image, all white
+        let myimage = ImageBuffer4ByteFloat::new(1024, 1024, 255.0);
+
+        // Create an image for halving the white image
+        let otherimage = ImageBuffer4ByteFloat::new(1024, 1024, 0.5);
+
+        // gray = 255 * 0.5
+        let grayimage = myimage * otherimage;
+
+        // Check the resulting value
+        assert_eq!(grayimage.get(0, 0), 127.5);
+    }
+
+    #[test]
+    fn create_gray_with_math_1byte() {
+        // Create a 1024x1024 image, all white
+        let myimage = ImageBuffer1ByteInt::new(1024, 1024, 255);
+
+        // gray = 255 / 2
+        let grayimage = myimage / 2;
+
+        // Check the resulting value
+        assert_eq!(grayimage.get(0, 0), 127);
     }
 }
