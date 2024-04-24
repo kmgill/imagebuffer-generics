@@ -3,7 +3,7 @@ use std::ops::{Add, Div, Index, IndexMut, Mul, Sub};
 use std::path::Path;
 
 use anyhow::{Error, Result};
-use image::{DynamicImage, Luma};
+use image::{open, ColorType::*, DynamicImage, Luma};
 use itertools::iproduct;
 
 /// Represents a valid number to be used as a generic constraint in `Buffer` and `ImageBuffer`.
@@ -1166,6 +1166,66 @@ impl<N: Num> ImageBuffer<N> {
             Err(Error::msg("Failed to save image"))
         }
     }
+
+    pub fn open_8bit(buffer: DynamicImage) -> Result<ImageBuffer<N>> {
+        let image_data = buffer.into_luma8();
+
+        let dims = image_data.dimensions();
+
+        let width = dims.0 as usize;
+        let height = dims.1 as usize;
+
+        let mut newbuffer = ImageBuffer::<N>::new(width, height, N::from_u8(0).unwrap());
+        for y in 0..height {
+            for x in 0..width {
+                let pixel = image_data.get_pixel(x as u32, y as u32);
+                newbuffer.set(x, y, N::from_u8(pixel[0]).unwrap());
+            }
+        }
+        Ok(newbuffer)
+    }
+
+    pub fn open_16bit(buffer: DynamicImage) -> Result<ImageBuffer<N>> {
+        let image_data = buffer.into_luma16();
+
+        let dims = image_data.dimensions();
+
+        let width = dims.0 as usize;
+        let height = dims.1 as usize;
+
+        let mut newbuffer = ImageBuffer::<N>::new(width, height, N::from_u16(0).unwrap());
+        for y in 0..height {
+            for x in 0..width {
+                let pixel = image_data.get_pixel(x as u32, y as u32);
+                newbuffer.set(x, y, N::from_u16(pixel[0]).unwrap());
+            }
+        }
+        Ok(newbuffer)
+    }
+
+    pub fn open(file_path: &str) -> Result<ImageBuffer<N>> {
+        let buffer = open(file_path).unwrap();
+
+        let _has_alpha = image_uses_alpha(&buffer);
+        let image_mode = image_bitmode(&buffer);
+
+        match image_mode {
+            ImageMode::U8BIT => ImageBuffer::<N>::open_8bit(buffer),
+            ImageMode::U16BIT => ImageBuffer::<N>::open_16bit(buffer),
+        }
+    }
+}
+
+fn image_uses_alpha(buffer: &DynamicImage) -> bool {
+    matches!(buffer.color(), La8 | Rgba8 | La16 | Rgba16 | Rgba32F)
+}
+
+fn image_bitmode(buffer: &DynamicImage) -> ImageMode {
+    match buffer.color() {
+        L8 | La8 | Rgb8 | Rgba8 => ImageMode::U8BIT,
+        L16 | La16 | Rgb16 | Rgba16 => ImageMode::U16BIT,
+        _ => panic!("Unsupported 32-bit image format"),
+    }
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
@@ -1380,5 +1440,62 @@ mod tests {
 
         // Check the resulting value
         assert_eq!(grayimage.get(0, 0), 127);
+    }
+
+    #[test]
+    fn test_open_image_8bit() -> Result<()> {
+        // The image is in color, but will be converted by the image module to grayscale.
+        let myimage = ImageBuffer1ByteInt::open("assets/test-image.jpg")?;
+        myimage.save_image_to(
+            "target/testsave_testimage_8bit_jpg",
+            OutputFormat::JPEG,
+            ImageMode::U8BIT,
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_open_image_8bit_save_16bit() -> Result<()> {
+        // The image is in color, but will be converted by the image module to grayscale.
+        let mut myimage = ImageBuffer4ByteFloat::open("assets/test-image.jpg")?;
+
+        // Scale values from 0-255 to 0-65535
+        myimage = myimage * 257.0;
+
+        myimage.save_image_to(
+            "target/testsave_testimage_8bit_into_16bit_png",
+            OutputFormat::PNG,
+            ImageMode::U16BIT,
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_open_image_16bit() -> Result<()> {
+        // The image is in color, but will be converted by the image module to grayscale.
+        let myimage = ImageBuffer2ByteInt::open("assets/test-image.png")?;
+        myimage.save_image_to(
+            "target/testsave_testimage_16bit_png",
+            OutputFormat::PNG,
+            ImageMode::U16BIT,
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_open_image_16bit_save_8bit() {
+        // The image is in color, but will be converted by the image module to grayscale.
+        let myimage = ImageBuffer2ByteInt::open("assets/test-image.png").unwrap();
+        myimage
+            .save_image_to(
+                "target/testsave_testimage_16bit_into_8bit_png",
+                OutputFormat::PNG,
+                ImageMode::U8BIT,
+            )
+            .unwrap();
     }
 }
