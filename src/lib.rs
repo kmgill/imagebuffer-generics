@@ -1167,7 +1167,10 @@ impl<N: Num> ImageBuffer<N> {
         }
     }
 
-    pub fn open_8bit(buffer: DynamicImage) -> Result<ImageBuffer<N>> {
+    /// Loads an unsigned 8 bit image from a `DynamicImage` buffer. If the image being loaded is RGB(A), it
+    /// will attept to convert it into a monochrome image before loading. The method in which the
+    /// conversion is handled is at the whim of the `image` crate.
+    fn open_8bit(buffer: DynamicImage) -> Result<ImageBuffer<N>> {
         let image_data = buffer.into_luma8();
 
         let dims = image_data.dimensions();
@@ -1185,7 +1188,10 @@ impl<N: Num> ImageBuffer<N> {
         Ok(newbuffer)
     }
 
-    pub fn open_16bit(buffer: DynamicImage) -> Result<ImageBuffer<N>> {
+    /// Loads an unsigned 16 bit image from a `DynamicImage` buffer. If the image being loaded is RGB(A), it
+    /// will attept to convert it into a monochrome image before loading. The method in which the
+    /// conversion is handled is at the whim of the `image` crate.
+    fn open_16bit(buffer: DynamicImage) -> Result<ImageBuffer<N>> {
         let image_data = buffer.into_luma16();
 
         let dims = image_data.dimensions();
@@ -1203,6 +1209,9 @@ impl<N: Num> ImageBuffer<N> {
         Ok(newbuffer)
     }
 
+    /// Opens an image from the filesystem. `ImageBuffer` is a single channel (monochrome) structure
+    /// and as such any image loaded will become grayscale. This method attempts to determine whether
+    /// the image being loaded is unsigned 8 or 16 bit (32 bit not yet supported).
     pub fn open(file_path: &str) -> Result<ImageBuffer<N>> {
         let buffer = open(file_path).unwrap();
 
@@ -1216,10 +1225,12 @@ impl<N: Num> ImageBuffer<N> {
     }
 }
 
+/// Checks whether a `DynamicImage` buffer contains an alpha channel by means of it's color enum
 fn image_uses_alpha(buffer: &DynamicImage) -> bool {
     matches!(buffer.color(), La8 | Rgba8 | La16 | Rgba16 | Rgba32F)
 }
 
+/// Determines the bit depth (8, 16 bit) from the `DynamicImage` color enum
 fn image_bitmode(buffer: &DynamicImage) -> ImageMode {
     match buffer.color() {
         L8 | La8 | Rgb8 | Rgba8 => ImageMode::U8BIT,
@@ -1228,6 +1239,7 @@ fn image_bitmode(buffer: &DynamicImage) -> ImageMode {
     }
 }
 
+/// Represents supported image output formats.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 pub enum OutputFormat {
     PNG,
@@ -1238,6 +1250,8 @@ pub enum OutputFormat {
 }
 
 impl OutputFormat {
+    /// Convenience function to convert a string image extension to the appropriate image
+    /// format enum value
     pub fn from_string(s: &str) -> Result<OutputFormat> {
         match s.to_uppercase().as_str() {
             "PNG" => Ok(OutputFormat::PNG),
@@ -1251,23 +1265,17 @@ impl OutputFormat {
         }
     }
 
+    /// Convenience function to determine the format enum value from the extension on a
+    /// given filename.
     pub fn from_filename(s: &str) -> Result<OutputFormat> {
         if let Some(extension) = Path::new(s).extension().and_then(OsStr::to_str) {
-            match extension.to_string().to_uppercase().as_str() {
-                // "DNG" => Ok(OutputFormat::DNG),
-                "PNG" => Ok(OutputFormat::PNG),
-                "TIF" | "TIFF" => Ok(OutputFormat::TIFF),
-                "JPG" | "JPEG" => Ok(OutputFormat::JPEG),
-                _ => Err(Error::msg(format!(
-                    "Unable to determine output format or is an unsupported format: {}",
-                    extension
-                ))),
-            }
+            OutputFormat::from_string(extension)
         } else {
             Err(Error::msg("Unable to isolate filename extension"))
         }
     }
 
+    /// Replaces the extension of a given filename with that of the provided new extension.
     pub fn replace_extension_with(filename: &str, new_extension: &str) -> Result<String> {
         if let Some(new_filename) = Path::new(filename).with_extension(new_extension).to_str() {
             Ok(new_filename.to_string())
@@ -1276,6 +1284,17 @@ impl OutputFormat {
         }
     }
 
+    /// Replaces the extension of a provided filename with that of the enum value on which this
+    /// method is called.
+    ///
+    /// **Example:**
+    /// ```
+    /// use imagebuffer_generics::OutputFormat;
+    ///
+    /// let foo = OutputFormat::PNG.replace_extension_for("foo.jpg").unwrap();
+    ///
+    /// assert_eq!(foo, "foo.png");
+    /// ```
     pub fn replace_extension_for(self, filename: &str) -> Result<String> {
         match self {
             // OutputFormat::DNG => replace_extension_with(filename, "dng"),
@@ -1286,9 +1305,13 @@ impl OutputFormat {
     }
 }
 
+/// Represents a supported input/output bit depth.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum ImageMode {
+    /// Unsigned one byte (8 bits)
     U8BIT,
+
+    /// Unsigned two bute (16 bits)
     U16BIT,
 }
 
