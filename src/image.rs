@@ -1,9 +1,9 @@
+use crate::imagebuffer::ImageBuffer;
+use crate::{util, ImageMode, Num, OutputFormat};
 use anyhow::{Error, Result};
 use image::{open, DynamicImage, Luma, LumaA, Rgb, Rgba};
 use itertools::iproduct;
-
-use crate::imagebuffer::ImageBuffer;
-use crate::{util, ImageMode, Num, OutputFormat};
+use std::ops::{Add, Div, Mul, Sub};
 
 /// Represents a two-dimensional multi-channel image.
 #[derive(Clone)]
@@ -11,6 +11,198 @@ pub struct Image<N: Num> {
     pub bands: Vec<ImageBuffer<N>>,
     pub width: usize,
     pub height: usize,
+}
+
+/////////////////////////////////
+// Image Add
+/////////////////////////////////
+
+impl<N: Num> Add for Image<N> {
+    type Output = Self;
+
+    /// Performs the + operation for `Image<N>`.
+    fn add(self, other: Self) -> Self {
+        if self.num_bands() != other.num_bands() {
+            panic!("Band count mismatch");
+        }
+
+        // I'm not wild about using clone() here. Gonna cause a lot of memory churn
+        // in a program with a lot of image math
+        let bands: Vec<ImageBuffer<N>> = (0..self.num_bands())
+            .map(|i| self.bands[i].clone() + other.bands[i].clone())
+            .collect();
+
+        let w = self.bands[0].width;
+        let h = self.bands[0].height;
+        Image {
+            bands,
+            width: w,
+            height: h,
+        }
+    }
+}
+
+impl<N: Num> Add<N> for Image<N> {
+    type Output = Self;
+
+    /// Performs the + operation for `ImageBuffer<N>` and a single value of type `N`.
+    fn add(self, other: N) -> Self {
+        let bands: Vec<ImageBuffer<N>> = (0..self.num_bands())
+            .map(|i| self.bands[i].clone() + other)
+            .collect();
+
+        let w = self.bands[0].width;
+        let h = self.bands[0].height;
+        Image {
+            bands,
+            width: w,
+            height: h,
+        }
+    }
+}
+
+/////////////////////////////////
+// Image Subtract
+/////////////////////////////////
+
+impl<N: Num> Sub for Image<N> {
+    type Output = Self;
+
+    /// Performs the - operation for `Image<N>`.
+    fn sub(self, other: Self) -> Self {
+        if self.num_bands() != other.num_bands() {
+            panic!("Band count mismatch");
+        }
+
+        // I'm not wild about using clone() here. Gonna cause a lot of memory churn
+        // in a program with a lot of image math
+        let bands: Vec<ImageBuffer<N>> = (0..self.num_bands())
+            .map(|i| self.bands[i].clone() - other.bands[i].clone())
+            .collect();
+
+        let w = self.bands[0].width;
+        let h = self.bands[0].height;
+        Image {
+            bands,
+            width: w,
+            height: h,
+        }
+    }
+}
+
+impl<N: Num> Sub<N> for Image<N> {
+    type Output = Self;
+
+    /// Performs the - operation for `ImageBuffer<N>` and a single value of type `N`.
+    fn sub(self, other: N) -> Self {
+        let bands: Vec<ImageBuffer<N>> = (0..self.num_bands())
+            .map(|i| self.bands[i].clone() - other)
+            .collect();
+
+        let w = self.bands[0].width;
+        let h = self.bands[0].height;
+        Image {
+            bands,
+            width: w,
+            height: h,
+        }
+    }
+}
+
+/////////////////////////////////
+// Image Multiplication
+/////////////////////////////////
+
+impl<N: Num> Mul for Image<N> {
+    type Output = Self;
+
+    /// Performs the * operation for `Image<N>`.
+    fn mul(self, other: Self) -> Self {
+        if self.num_bands() != other.num_bands() {
+            panic!("Band count mismatch");
+        }
+
+        // I'm not wild about using clone() here. Gonna cause a lot of memory churn
+        // in a program with a lot of image math
+        let bands: Vec<ImageBuffer<N>> = (0..self.num_bands())
+            .map(|i| self.bands[i].clone() * other.bands[i].clone())
+            .collect();
+
+        let w = self.bands[0].width;
+        let h = self.bands[0].height;
+        Image {
+            bands,
+            width: w,
+            height: h,
+        }
+    }
+}
+
+impl<N: Num> Mul<N> for Image<N> {
+    type Output = Self;
+
+    /// Performs the * operation for `ImageBuffer<N>` and a single value of type `N`.
+    fn mul(self, other: N) -> Self {
+        let bands: Vec<ImageBuffer<N>> = (0..self.num_bands())
+            .map(|i| self.bands[i].clone() * other)
+            .collect();
+
+        let w = self.bands[0].width;
+        let h = self.bands[0].height;
+        Image {
+            bands,
+            width: w,
+            height: h,
+        }
+    }
+}
+
+/////////////////////////////////
+// Image Division
+/////////////////////////////////
+
+impl<N: Num> Div for Image<N> {
+    type Output = Self;
+
+    /// Performs the / operation for `Image<N>`.
+    fn div(self, other: Self) -> Self {
+        if self.num_bands() != other.num_bands() {
+            panic!("Band count mismatch");
+        }
+
+        // I'm not wild about using clone() here. Gonna cause a lot of memory churn
+        // in a program with a lot of image math
+        let bands: Vec<ImageBuffer<N>> = (0..self.num_bands())
+            .map(|i| self.bands[i].clone() / other.bands[i].clone())
+            .collect();
+
+        let w = self.bands[0].width;
+        let h = self.bands[0].height;
+        Image {
+            bands,
+            width: w,
+            height: h,
+        }
+    }
+}
+
+impl<N: Num> Div<N> for Image<N> {
+    type Output = Self;
+
+    /// Performs the / operation for `ImageBuffer<N>` and a single value of type `N`.
+    fn div(self, other: N) -> Self {
+        let bands: Vec<ImageBuffer<N>> = (0..self.num_bands())
+            .map(|i| self.bands[i].clone() / other)
+            .collect();
+
+        let w = self.bands[0].width;
+        let h = self.bands[0].height;
+        Image {
+            bands,
+            width: w,
+            height: h,
+        }
+    }
 }
 
 impl<N: Num> Image<N> {
@@ -494,6 +686,22 @@ mod tests {
     use std::path::Path;
 
     use super::*;
+
+    #[test]
+    fn test_scale_8bit_to_16bit() -> Result<()> {
+        let mut a = Image::<u16>::open("assets/test-image.jpg")?;
+        a = a * 257;
+
+        a.save_to(
+            "target/testsave_image_scaled_16bit_png",
+            OutputFormat::PNG,
+            ImageMode::U16BIT,
+        )?;
+
+        assert!(Path::new("target/testsave_image_scaled_16bit_png.png").exists());
+
+        Ok(())
+    }
 
     #[test]
     fn test_open_rgb_image() -> Result<()> {

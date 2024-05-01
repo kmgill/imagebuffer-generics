@@ -66,6 +66,27 @@ fn open_and_save_rgb_image() -> Result<()> {
 
     Ok(())
 }
+
+fn scale_8bit_to_16bit() -> Result<()> {
+
+    // Open an image as initial type u16
+    let mut a = Image::<u16>::open("assets/test-image.jpg")?;
+
+    // Upscale the depth from 256 to 65536 values.
+    a = a * 257;
+
+    // Save the image
+    a.save_to(
+        "target/testsave_image_scaled_16bit_png",
+        OutputFormat::PNG,
+        ImageMode::U16BIT,
+    )?;
+
+    // Check that the new iamge exists
+    assert!(Path::new("target/testsave_image_scaled_16bit_png.png").exists());
+
+    Ok(())
+}
 ```
 
 
